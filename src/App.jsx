@@ -40,19 +40,14 @@ export default function FireAcademyStudyGenerator() {
     setError('');
 
     try {
-      const notesResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      // Generate Study Notes
+      const notesResponse = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': process.env.REACT_APP_CLAUDE_API_KEY,
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2000,
-          messages: [
-            {
-              role: 'user',
-              content: `You are an expert firefighter instructor specializing in "Essentials of Firefighting 1 & 2" curriculum. A student has provided this lecture transcript. Your job is to create clear, organized study notes.
+          transcript: `You are an expert firefighter instructor specializing in "Essentials of Firefighting 1 & 2" curriculum. A student has provided this lecture transcript. Your job is to create clear, organized study notes.
 
 LECTURE TRANSCRIPT:
 ${transcriptText}
@@ -72,8 +67,6 @@ Format the notes as:
 - [Important definitions in brackets]
 
 Make the notes concise but comprehensive - perfect for studying before an exam.`,
-            },
-          ],
         }),
       });
 
@@ -82,19 +75,14 @@ Make the notes concise but comprehensive - perfect for studying before an exam.`
       const generatedNotes = notesData.content[0].text;
       setStudyNotes(generatedNotes);
 
-      const questionsResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      // Generate Questions
+      const questionsResponse = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': process.env.REACT_APP_CLAUDE_API_KEY,
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 8000,
-          messages: [
-            {
-              role: 'user',
-              content: `You are an expert firefighter instructor creating practice questions for Essentials of Firefighting 1 & 2 students. Based on this lecture transcript, create a mix of question types to help the student prepare for exams and practical scenarios.
+          transcript: `You are an expert firefighter instructor creating practice questions for Essentials of Firefighting 1 & 2 students. Based on this lecture transcript, create a mix of question types to help the student prepare for exams and practical scenarios.
 
 LECTURE TRANSCRIPT:
 ${transcriptText}
@@ -146,8 +134,6 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
     }
   ]
 }`,
-            },
-          ],
         }),
       });
 
