@@ -14,10 +14,8 @@ export default function FireAcademyStudyGenerator() {
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     setFileName(file.name);
     setError('');
-
     const reader = new FileReader();
     reader.onload = (event) => {
       setTranscriptText(event.target.result);
@@ -38,12 +36,10 @@ export default function FireAcademyStudyGenerator() {
       setError('Please paste or upload a transcript');
       return;
     }
-
     setLoading(true);
     setError('');
 
     try {
-      // Generate Study Notes
       const notesResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -56,10 +52,14 @@ export default function FireAcademyStudyGenerator() {
           messages: [
             {
               role: 'user',
-              content: `You are an expert firefighter instructor specializing in "Essentials of Firefighting 1 & 2" curriculum.
+              content: `You are an expert firefighter instructor specializing in "Essentials of Firefighting 1 & 2" curriculum. A student has provided this lecture transcript. Your job is to create clear, organized study notes.
 
-A student has provided this lecture transcript. Your job is to create clear, organized study notes that will help them prepare for exams and practical assessments.
+LECTURE TRANSCRIPT:
+${transcriptText}
 
+Please create study notes that:
+1. Extract and organize key concepts by topic
+2.
 LECTURE TRANSCRIPT:
 ${transcriptText}
 
