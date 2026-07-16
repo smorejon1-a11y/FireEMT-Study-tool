@@ -98,7 +98,7 @@ Make the notes concise but comprehensive - perfect for studying before an exam.`
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 3000,
+          max_tokens: 8000,
           messages: [
             {
               role: 'user',
@@ -109,13 +109,11 @@ Based on this lecture transcript, create a mix of question types to help the stu
 LECTURE TRANSCRIPT:
 ${transcriptText}
 
-Generate 10-15 questions mixing these types:
+Generate 50 questions mixing these types:
 - Multiple choice (4 options)
 - Short answer (facts/procedures)
-- Scenario-based (real-world situations)
 - True/False
 - Matching (terms to definitions)
-- Essay (deeper understanding)
 
 IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
 
