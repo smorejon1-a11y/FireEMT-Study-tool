@@ -5,6 +5,10 @@ export default async function handler(req, res) {
 
   const { transcript } = req.body;
 
+  if (!transcript) {
+    return res.status(400).json({ error: 'No transcript provided' });
+  }
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -14,14 +18,24 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: transcript }],
+        max_tokens: 8000,
+        messages: [
+          {
+            role: 'user',
+            content: transcript,
+          },
+        ],
       }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json();
+      return res.status(response.status).json({ error: errorData.error?.message || 'API error' });
+    }
+
     const data = await response.json();
-    res.status(200).json(data);
+    return res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 }
