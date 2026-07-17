@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, BookOpen, Zap, Loader, RotateCcw, Download } from 'lucide-react';
+import { Upload, BookOpen, Zap, Loader, RotateCcw, Download, FolderOpen, Save } from 'lucide-react';
 
 export default function FireAcademyStudyGenerator() {
   const [transcriptText, setTranscriptText] = useState('');
@@ -8,7 +8,9 @@ export default function FireAcademyStudyGenerator() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('upload');
   const [fileName, setFileName] = useState('');
+  const [quizName, setQuizName] = useState('');
   const fileInputRef = useRef(null);
+  const questionFileRef = useRef(null);
 
   // Quiz state
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -38,6 +40,44 @@ export default function FireAcademyStudyGenerator() {
     setFileName('Pasted transcript');
   };
 
+  // Load saved question bank
+  const handleQuestionBankUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setError('');
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target.result);
+        if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+          setQuestions(data.questions);
+          setQuizName(data.quizName || file.name.replace('.json', ''));
+          resetQuizState();
+          setActiveTab('quiz');
+        } else {
+          setError('Invalid question bank file. Please upload a file downloaded from this app.');
+        }
+      } catch (err) {
+        setError('Could not read question bank file. Make sure it is a valid JSON file from this app.');
+      }
+    };
+    reader.onerror = () => {
+      setError('Error reading file. Please try again.');
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be uploaded again
+    e.target.value = '';
+  };
+
+  const resetQuizState = () => {
+    setCurrentQuestion(0);
+    setSelectedAnswer(null);
+    setShowFeedback(false);
+    setScore(0);
+    setAnsweredQuestions([]);
+    setQuizComplete(false);
+  };
+
   const generateQuestions = async () => {
     if (!transcriptText.trim()) {
       setError('Please paste or upload a transcript');
@@ -58,7 +98,7 @@ export default function FireAcademyStudyGenerator() {
 LECTURE TRANSCRIPT:
 ${transcriptText}
 
-Generate 50 questions mixing these types: Multiple choice (4 options), Short answer (facts/procedures), True/False.
+Generate 50 questions mixing these types: Multiple choice (4 options), True/False.
 
 IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
 
@@ -74,13 +114,6 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
     },
     {
       "id": 2,
-      "type": "short_answer",
-      "question": "Question text here?",
-      "answer": "Expected answer",
-      "explanation": "Why this answer is correct based on the lecture..."
-    },
-    {
-      "id": 3,
       "type": "true_false",
       "question": "Statement here?",
       "answer": true,
@@ -99,12 +132,8 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
       if (jsonMatch) {
         const parsedQuestions = JSON.parse(jsonMatch[0]);
         setQuestions(parsedQuestions.questions || []);
-        setCurrentQuestion(0);
-        setSelectedAnswer(null);
-        setShowFeedback(false);
-        setScore(0);
-        setAnsweredQuestions([]);
-        setQuizComplete(false);
+        setQuizName(fileName.replace(/\.(txt|md|docx|doc)$/i, '') || 'Quiz');
+        resetQuizState();
         setActiveTab('quiz');
       } else {
         setError('Could not generate questions. Please try again.');
@@ -115,6 +144,57 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
     } finally {
       setLoading(false);
     }
+  };
+
+  // Download question bank as JSON (for reloading later)
+  const downloadQuestionBank = () => {
+    const bankData = {
+      quizName: quizName || 'Fire Academy Quiz',
+      createdDate: new Date().toISOString(),
+      totalQuestions: questions.length,
+      questions: questions,
+    };
+
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(bankData, null, 2)));
+    element.setAttribute('download', `${(quizName || 'quiz').replace(/[^a-z0-9]/gi, '-').toLowerCase()}-question-bank.json`);
+    element.click();
+  };
+
+  // Download printable questions and answers as text
+  const downloadPrintableQuiz = () => {
+    let content = `FIRE ACADEMY QUESTION BANK\n`;
+    content += `Quiz: ${quizName || 'Fire Academy Quiz'}\n`;
+    content += `Generated: ${new Date().toLocaleDateString()}\n`;
+    content += `Total Questions: ${questions.length}\n`;
+    content += `${'='.repeat(60)}\n\n`;
+    content += `QUESTIONS\n${'-'.repeat(60)}\n\n`;
+
+    questions.forEach((q, i) => {
+      content += `${i + 1}. [${q.type.replace(/_/g, ' ').toUpperCase()}]\n`;
+      content += `${q.question}\n`;
+      if (q.options) {
+        q.options.forEach(opt => {
+          content += `   ${opt}\n`;
+        });
+      }
+      if (q.type === 'true_false') {
+        content += `   True / False\n`;
+      }
+      content += `\n`;
+    });
+
+    content += `\n${'='.repeat(60)}\n\nANSWER KEY\n${'-'.repeat(60)}\n\n`;
+
+    questions.forEach((q, i) => {
+      content += `${i + 1}. Answer: ${q.answer}\n`;
+      content += `   Explanation: ${q.explanation}\n\n`;
+    });
+
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+    element.setAttribute('download', `${(quizName || 'quiz').replace(/[^a-z0-9]/gi, '-').toLowerCase()}-printable.txt`);
+    element.click();
   };
 
   const handleAnswerSubmit = () => {
@@ -156,18 +236,14 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
   };
 
   const restartQuiz = () => {
-    setCurrentQuestion(0);
-    setSelectedAnswer(null);
-    setShowFeedback(false);
-    setScore(0);
-    setAnsweredQuestions([]);
-    setQuizComplete(false);
+    resetQuizState();
   };
 
   const downloadResults = () => {
-    let content = `FIRE ACADEMY QUIZ RESULTS\nGenerated: ${new Date().toLocaleDateString()}\n`;
+    let content = `FIRE ACADEMY QUIZ RESULTS\n`;
+    content += `Quiz: ${quizName || 'Fire Academy Quiz'}\n`;
+    content += `Date: ${new Date().toLocaleDateString()}\n`;
     content += `${'='.repeat(60)}\n\n`;
-    content += `Source: ${fileName}\n`;
     content += `Total Questions: ${questions.length}\n`;
     content += `Correct Answers: ${score}/${questions.length}\n`;
     content += `Percentage: ${Math.round((score / questions.length) * 100)}%\n\n`;
@@ -177,29 +253,22 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
       const answered = answeredQuestions[i];
       const isCorrect = answered?.correct;
       
-      content += `${i + 1}. [${q.type.toUpperCase()}] ${isCorrect ? '✓ CORRECT' : '✗ INCORRECT'}\n`;
+      content += `${i + 1}. [${q.type.toUpperCase()}] ${isCorrect ? 'CORRECT' : 'INCORRECT'}\n`;
       content += `Question: ${q.question}\n`;
       
       if (q.type === 'multiple_choice') {
         q.options.forEach(opt => {
           content += `${opt}\n`;
         });
-        content += `Your Answer: ${answered?.selected || 'Not answered'}\n`;
-        content += `Correct Answer: ${q.answer}\n`;
-      } else if (q.type === 'true_false') {
-        content += `Your Answer: ${answered?.selected || 'Not answered'}\n`;
-        content += `Correct Answer: ${q.answer}\n`;
-      } else {
-        content += `Your Answer: ${answered?.selected || 'Not answered'}\n`;
-        content += `Correct Answer: ${q.answer}\n`;
       }
-      
+      content += `Your Answer: ${answered?.selected || 'Not answered'}\n`;
+      content += `Correct Answer: ${q.answer}\n`;
       content += `Explanation: ${q.explanation}\n\n`;
     });
 
     const element = document.createElement('a');
     element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
-    element.setAttribute('download', `fire-academy-quiz-results-${new Date().toISOString().split('T')[0]}.txt`);
+    element.setAttribute('download', `quiz-results-${new Date().toISOString().split('T')[0]}.txt`);
     element.click();
   };
 
@@ -209,6 +278,32 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
 
     return (
       <div className="space-y-6">
+        {/* Quiz Name & Download Bank */}
+        <div className="flex items-center justify-between bg-white rounded-lg shadow p-4 border border-gray-200">
+          <div>
+            <p className="text-sm text-gray-500">Current Quiz</p>
+            <p className="font-bold text-gray-900">{quizName || 'Fire Academy Quiz'}</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={downloadQuestionBank}
+              className="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 flex items-center gap-2"
+              title="Download question bank to reload later"
+            >
+              <Save size={16} />
+              Save Question Bank
+            </button>
+            <button
+              onClick={downloadPrintableQuiz}
+              className="bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-600 flex items-center gap-2"
+              title="Download printable questions and answer key"
+            >
+              <Download size={16} />
+              Printable Version
+            </button>
+          </div>
+        </div>
+
         {/* Progress */}
         <div className="bg-gray-100 p-4 rounded-lg">
           <div className="flex justify-between text-sm font-semibold text-gray-700 mb-2">
@@ -317,7 +412,7 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
               <p className={`font-bold mb-2 ${
                 answeredQuestions[currentQuestion]?.correct ? 'text-green-900' : 'text-red-900'
               }`}>
-                {answeredQuestions[currentQuestion]?.correct ? '✓ Correct!' : '✗ Incorrect'}
+                {answeredQuestions[currentQuestion]?.correct ? 'Correct!' : 'Incorrect'}
               </p>
               {!answeredQuestions[currentQuestion]?.correct && (
                 <p className="text-red-800 mb-3">
@@ -372,20 +467,34 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
           {percentage >= 60 && percentage < 80 && <p className="text-lg text-blue-600 font-semibold mb-4">Good job! Review the missed questions.</p>}
           {percentage < 60 && <p className="text-lg text-orange-600 font-semibold mb-4">Keep studying! Review the material and try again.</p>}
 
-          <div className="flex gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={restartQuiz}
-              className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 flex items-center justify-center gap-2"
+              className="bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 flex items-center justify-center gap-2"
             >
               <RotateCcw size={20} />
               Retake Quiz
             </button>
             <button
               onClick={downloadResults}
-              className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 flex items-center justify-center gap-2"
+              className="bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 flex items-center justify-center gap-2"
             >
               <Download size={20} />
               Download Results
+            </button>
+            <button
+              onClick={downloadQuestionBank}
+              className="bg-gray-700 text-white py-3 rounded-lg font-semibold hover:bg-gray-800 flex items-center justify-center gap-2"
+            >
+              <Save size={20} />
+              Save Question Bank
+            </button>
+            <button
+              onClick={downloadPrintableQuiz}
+              className="bg-gray-500 text-white py-3 rounded-lg font-semibold hover:bg-gray-600 flex items-center justify-center gap-2"
+            >
+              <Download size={20} />
+              Printable Version
             </button>
           </div>
         </div>
@@ -470,6 +579,39 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
         {/* Upload Tab */}
         {activeTab === 'upload' && (
           <div className="space-y-6">
+            {/* Load Saved Question Bank */}
+            <div className="bg-white rounded-lg shadow p-8 border-2 border-blue-200">
+              <h2 className="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <FolderOpen size={24} className="text-blue-600" />
+                Load Saved Question Bank
+              </h2>
+              <p className="text-gray-600 text-sm mb-4">
+                Previously saved a question bank? Load it here to retake the quiz for exam prep.
+              </p>
+              <button
+                onClick={() => questionFileRef.current?.click()}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2"
+              >
+                <FolderOpen size={20} />
+                Load Question Bank (.json file)
+              </button>
+              <input
+                ref={questionFileRef}
+                type="file"
+                onChange={handleQuestionBankUpload}
+                className="hidden"
+                accept=".json"
+              />
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1 border-t border-gray-300"></div>
+              <span className="text-gray-500 text-sm font-semibold">OR CREATE NEW QUIZ</span>
+              <div className="flex-1 border-t border-gray-300"></div>
+            </div>
+
+            {/* Upload Card */}
             <div className="bg-white rounded-lg shadow p-8 border border-gray-200">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Upload Transcript or Lecture Notes</h2>
 
@@ -512,14 +654,15 @@ IMPORTANT: Output ONLY valid JSON, nothing else. Use this exact format:
               </div>
             </div>
 
+            {/* Info Box */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
               <h3 className="font-semibold text-blue-900 mb-2">How It Works</h3>
               <ol className="space-y-1 text-blue-900 text-sm list-decimal list-inside">
                 <li>Upload a transcript or paste lecture notes</li>
-                <li>Click "Generate Quiz"</li>
-                <li>Answer 50 interactive questions</li>
-                <li>Get instant feedback on each answer</li>
-                <li>Review your results at the end</li>
+                <li>Click "Generate Quiz" to create 50 interactive questions</li>
+                <li>Answer questions and get instant feedback</li>
+                <li>Save the question bank to retake before finals</li>
+                <li>Load any saved question bank anytime for review</li>
               </ol>
             </div>
 
