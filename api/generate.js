@@ -16,6 +16,9 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'API key not configured' });
     }
 
+    console.log('API Key present:', !!apiKey);
+    console.log('Transcript length:', transcript.length);
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -30,7 +33,21 @@ export default async function handler(req, res) {
       }),
     });
 
-    const data = await response.json();
+    console.log('Claude response status:', response.status);
+    
+    const responseText = await response.text();
+    console.log('Claude response text:', responseText.substring(0, 200));
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.log('Failed to parse JSON:', e.message);
+      return res.status(response.status).json({ 
+        error: 'Claude API returned invalid response',
+        raw: responseText.substring(0, 500)
+      });
+    }
 
     if (!response.ok) {
       return res.status(response.status).json(data);
@@ -38,7 +55,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json(data);
   } catch (error) {
+    console.log('Error:', error.message);
     return res.status(500).json({ error: error.message });
   }
-}
 }
