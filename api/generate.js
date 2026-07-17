@@ -1,29 +1,27 @@
 export default async function handler(req, res) {
-  console.log('=== API CALLED ===');
-  console.log('Method:', req.method);
-  console.log('Body keys:', Object.keys(req.body || {}));
-  console.log('Body:', JSON.stringify(req.body));
-
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const body = req.body || {};
-  const transcript = body.transcript;
-
-  console.log('Transcript exists:', !!transcript);
-  console.log('Transcript length:', transcript?.length || 0);
-
-  if (!transcript) {
-    return res.status(400).json({ error: 'No transcript in request body', received: body });
-  }
-
   try {
+    const body = req.body || {};
+    const transcript = body.transcript;
+
+    if (!transcript) {
+      return res.status(400).json({ error: 'No transcript provided' });
+    }
+
+    const apiKey = process.env.REACT_APP_CLAUDE_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'API key not configured' });
+    }
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.REACT_APP_CLAUDE_API_KEY,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
@@ -33,7 +31,6 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    console.log('Claude status:', response.status);
 
     if (!response.ok) {
       return res.status(response.status).json(data);
@@ -41,7 +38,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json(data);
   } catch (error) {
-    console.log('Error:', error.message);
     return res.status(500).json({ error: error.message });
   }
+}
 }
